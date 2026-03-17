@@ -1,0 +1,9 @@
+
+
+audiofinger/
+*.png
+data/
+.models/
+__pycache__/
+data_v1/
+IRMAS_Data/

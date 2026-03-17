@@ -1,0 +1,10 @@
+librosa
+numpy
+scipy
+pandas
+scikit-learn
+matplotlib
+tqdm
+soundfile
+joblib
+faiss-cpu
