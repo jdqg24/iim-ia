@@ -1,9 +1,29 @@
+# Entornos virtuales
+venv/
+env/
+.env/
 
-
-audiofinger/
-*.png
-data/
-.models/
+# Archivos compilados de Python
 __pycache__/
+*.pyc
+*.pyo
+
+# DATOS PESADOS Y AUDIOS
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.csv
+*.png
+
+# Carpetas de datos locales
 data_v1/
 IRMAS_Data/
+musical_instruments/
+
+# Archivos de Jupyter Notebook de experimentación temporal
+.ipynb_checkpoints/
+
+# Archivos del Sistema Operativo
+.DS_Store
+Thumbs.db

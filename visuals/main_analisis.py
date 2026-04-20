@@ -3,7 +3,7 @@ import config_visual as cfg
 import visualizaciones as vis
 
 # 0. Carga y Configuración
-df = pd.read_csv('features_huella_teorica_consolidada_irmas.csv')
+df = pd.read_csv('../data_v1/features_dataset.csv')
 palette = cfg.set_scientific_style()
 
 # 1. Ejecutar Análisis Visual

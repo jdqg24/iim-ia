@@ -64,20 +64,20 @@ def compute_chroma_features(y, sr):
     return chroma_stft, chroma_cens, tonnetz
 
 
-# ===== Rhythm & Pitch Features =====
+# ===== Rhythm & Pitch =====
 def compute_rhythm_and_pitch(y, sr):
     """
     Calcula la frecuencia fundamental (Pitch), la fuerza de inicio (Onset) 
     y estima el Tempo global (BPM).
     """
-    # Onset strength (Fuerza de los "golpes" o inicios de nota)
+    # Onset strength
     onset_env = librosa.onset.onset_strength(y=y, sr=sr)
     
-    # Tempo (BPM) - Devuelve un escalar, así que lo dejamos como un valor único
+    # Tempo (BPM) - Devuelve un escalar
     tempo = librosa.feature.tempo(onset_envelope=onset_env, sr=sr)[0]
     
-    # Pitch (F0) usando el algoritmo YIN. 
-    # Sustituimos los NaNs (momentos de silencio/ruido sin tono) por 0.
+    # Pitch (F0) - algoritmo YIN. 
+    # Sustituye los NaNs por 0.
     f0 = librosa.yin(y, fmin=50, fmax=2000)
     f0 = np.nan_to_num(f0)
     
@@ -172,7 +172,7 @@ def compute_harmonic_purity(y, sr):
     return np.array([harmonic_ratio, hnr])
 
 def compute_vibrato_features(y, sr):
-    # Extraemos F0
+    # Extraer F0
     f0 = librosa.yin(y, fmin=65, fmax=2000) # Rango estándar de instrumentos
     f0 = np.nan_to_num(f0)
     
@@ -180,14 +180,14 @@ def compute_vibrato_features(y, sr):
     if len(active_f0) < 2:
         return np.array([0.0, 0.0, 0.0])
 
-    # 1. Extensión (Cents): Cuánto oscila la nota
+    # 1. Extensión (Cents)
     f0_cents = 1200 * np.log2(active_f0 / 10.0)
     vibrato_extent = np.std(f0_cents)
     
-    # 2. Velocidad: Rapidez de los cambios
+    # 2. Velocidad (Hz)
     vibrato_speed = np.mean(np.abs(np.diff(active_f0)))
     
-    # 3. Estabilidad armónica
+    # 3. Estabilidad
     spec_flatness = np.mean(librosa.feature.spectral_flatness(y=y))
     
     return np.array([vibrato_extent, vibrato_speed, spec_flatness])

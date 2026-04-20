@@ -43,7 +43,7 @@ def generar_espectrogramas_individuales(diccionario_audios):
             img = librosa.display.specshow(S_db, x_axis='time', y_axis='log', sr=sr, ax=ax, cmap='magma')
             
             # 6. Configuraciones estéticas del gráfico
-            ax.set_title(f'Espectrograma de Análisis: {etiqueta_clase.upper()}', fontweight='bold')
+            ax.set_title(f'Espectrograma de Análisis: {etiqueta_clase.upper()} (polifónico)', fontweight='bold')
             ax.set_ylabel('Frecuencia (Hz - Log)')
             ax.set_xlabel('Tiempo (s)')
             
@@ -73,11 +73,11 @@ def generar_espectrogramas_individuales(diccionario_audios):
 # CONFIGURACIÓN Y EJECUCIÓN 
 # ==========================================
 audios_ejemplo = {
-    'IRMAS_Data/pia/[pia][jaz_blu]1356__1.wav': 'pia',     
-    'IRMAS_Data/vio/[vio][jaz_blu]2109__2.wav': 'vio',    
-    'IRMAS_Data/flu/[flu][jaz_blu]0458__2.wav': 'flu',    
-    'IRMAS_Data/gac/[gac][pop_roc]0706__1.wav': 'gac',  
-    'IRMAS_Data/sax/[sax][jaz_blu]1758__3.wav': 'sax'    
+    '../IRMAS_Data/pia/[pia][jaz_blu]1531__1.wav': 'pia',     
+    '../IRMAS_Data/vio/[vio][jaz_blu]2109__2.wav': 'vio',    
+    '../IRMAS_Data/flu/[flu][jaz_blu]0458__2.wav': 'flu',    
+    '../IRMAS_Data/gac/[gac][pop_roc]0706__2.wav': 'gac',  
+    '../IRMAS_Data/sax/[sax][jaz_blu]1758__2.wav': 'sax'    
 }
 
 # Ejecutar el script
