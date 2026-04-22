@@ -239,7 +239,7 @@ if uploaded_file is not None and ejecutar:
         st.subheader("Reporte de Inferencia Global")
         
         if certeza_global < umbral:
-            st.warning(f"Diagnóstico Inconcluso: La certeza promedio ({certeza_global*100:.2f}%) no supera el umbral establecido del {umbral*100:.0f}%. El audio presenta características altamente mixtas.")
+            st.warning(f"Diagnóstico Inconcluso: La certeza promedio ({certeza_global*100:.2f}%) no supera el umbral establecido del {umbral*100:.0f}%. El audio presenta características desconocidas o altamente mixtas.")
         else:
             col_met1, col_met2, col_met3 = st.columns(3)
             col_met1.metric(label="Clase Predominante Identificada", value=nombre_instrumento)
@@ -250,7 +250,7 @@ if uploaded_file is not None and ejecutar:
 
         # --- SECCIÓN 2: LABORATORIO DE ANÁLISIS VISUAL ---
         st.markdown("---")
-        st.subheader("Laboratorio de Análisis Paramétrico (Señal Completa)")
+        st.subheader("Análisis Paramétrico")
         
         tab1, tab2, tab3 = st.tabs(["Espectrograma Mel", "Evolución del Centroide", "Morfología de la Onda"])
         
