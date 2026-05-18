@@ -324,7 +324,7 @@ if uploaded_file is not None and ejecutar:
 elif uploaded_file is None:
     st.subheader("Capacidad de Inferencia")
     st.markdown("""
-    El modelo actual ha sido entrenado exclusivamente para aislar e identificar las firmas acústicas de los siguientes instrumentos:
+    El modelo actual ha sido entrenado exclusivamente para identificar las firmas acústicas de los siguientes instrumentos:
     * **Guitarra Acústica**
     * **Piano**
     * **Violín**
