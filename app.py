@@ -135,6 +135,20 @@ instrument_map = {
 }
 
 with st.sidebar:
+    # --- NUEVA SECCIÓN DE ALCANCE ---
+    st.subheader("Capacidad de Inferencia")
+    st.markdown("""
+    El modelo ha sido entrenado exclusivamente para aislar e identificar las firmas acústicas de los siguientes instrumentos:
+    * 🎸 **Guitarra Acústica**
+    * 🎹 **Piano**
+    * 🎻 **Violín**
+    * 🌬️ **Flauta**
+    * 🎷 **Saxofón**
+    
+    *(El ingreso de señales fuera de este dominio espectral forzará una predicción sobre la clase más cercana).*
+    """)
+    
+    st.markdown("---")
     st.subheader("Parámetros de Entrada")
     uploaded_file = st.file_uploader("Archivo fuente (WAV, MP3)", type=["wav", "mp3"])
     
