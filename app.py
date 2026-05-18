@@ -10,7 +10,6 @@ import librosa.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import time
-import time
 
 from src.preprocessing.preprocess_audio import load_and_normalize
 from src.utils.audio_utils_v2 import (
@@ -25,8 +24,6 @@ from src.utils.audio_utils_v2 import (
 
 # === 1. Configuración de la página ===
 st.set_page_config(page_title="Inferencia Acústica", layout="wide")
-# === 1. Configuración de la página ===
-st.set_page_config(page_title="Inferencia Acústica", layout="wide")
 
 plt.rcParams.update({
     'font.size': 10,
@@ -39,7 +36,6 @@ plt.rcParams.update({
     'grid.color': '#e9ecef'
 })
 
-st.title("Identificación Acústica de Instrumentos Musicales")
 st.title("Identificación Acústica de Instrumentos Musicales")
 st.markdown("""
 Plataforma analítica fundamentada en **Extreme Gradient Boosting (XGBoost)** para la clasificación multiclase de señales acústicas. 
@@ -56,7 +52,7 @@ try:
     model_data = load_model()
     pipeline = model_data['pipeline']
     le = model_data['label_encoder']
-    expected_features = model_data['expected_features'] # NUEVO: Cargamos el esquema exacto
+    expected_features = model_data['expected_features'] 
 except Exception as e:
     st.error("Excepción de I/O: No se localizó el archivo del modelo predictivo.")
     st.stop()
@@ -89,7 +85,6 @@ def get_feature_names():
     for s in stats: feature_names.append(f"F0_{s}")
     feature_names.append("Tempo_BPM")
 
-    # OPTIMIZACIÓN: Solo generamos nombres para MFCC y MFCC_delta. Ignoramos delta2.
     for prefix in ["MFCC", "MFCC_delta"]:
         for i in range(1, 14):
             for s in stats:
@@ -99,21 +94,10 @@ def get_feature_names():
 def extract_single_feature_vector(y, sr):
     b, a = scipy.signal.butter(N=4, Wn=100 / (sr / 2), btype='high')
     y_filt = scipy.signal.filtfilt(b, a, y)
-    y_filt = scipy.signal.filtfilt(b, a, y)
 
     if len(y_filt) < 2048:
         y_filt = np.pad(y_filt, (0, 2048 - len(y_filt)), mode='constant')
-    if len(y_filt) < 2048:
-        y_filt = np.pad(y_filt, (0, 2048 - len(y_filt)), mode='constant')
 
-    temp_feat = compute_temporal_features(y_filt, sr).tolist()
-    spec_feat = compute_spectral_features(y_filt, sr).tolist()
-    anti_conf_feat = compute_anti_confusion_features(y_filt, sr).tolist()
-    energy_ratio_feat = compute_energy_ratios(y_filt, sr).tolist()
-    harmonic_purity_feat = compute_harmonic_purity(y_filt, sr).tolist() 
-    env_feat = compute_envelope_stats(y_filt).tolist()
-    vibrato_feat = compute_vibrato_features(y_filt, sr).tolist()
-    bow_reed_feat = compute_bow_vs_reed_features(y_filt, sr).tolist()
     temp_feat = compute_temporal_features(y_filt, sr).tolist()
     spec_feat = compute_spectral_features(y_filt, sr).tolist()
     anti_conf_feat = compute_anti_confusion_features(y_filt, sr).tolist()
@@ -127,10 +111,8 @@ def extract_single_feature_vector(y, sr):
     chroma_stft, chroma_cens, tonnetz = compute_chroma_features(y_filt, sr)
     onset_env, f0, tempo = compute_rhythm_and_pitch(y_filt, sr)
     
-    # OPTIMIZACIÓN: Ignoramos el tercer valor devuelto (delta2) con el guión bajo "_"
     mfcc, delta, _ = compute_mfcc_features(y_filt, sr)
 
-    # OPTIMIZACIÓN: Ya no concatenamos compute_stats(delta2)
     final_vector = (
         temp_feat + spec_feat + anti_conf_feat + energy_ratio_feat + 
         harmonic_purity_feat + env_feat + vibrato_feat + bow_reed_feat +
@@ -140,12 +122,7 @@ def extract_single_feature_vector(y, sr):
         compute_stats(mfcc) + compute_stats(delta)
     )
     
-    # Creamos un DataFrame con las 480 características extraídas
     df_temp = pd.DataFrame([final_vector], columns=get_feature_names())
-    
-    # FILTRADO DINÁMICO: 
-    # Le decimos a Pandas que seleccione ÚNICAMENTE las 473 columnas que el modelo conoce,
-    # ignorando automáticamente las 7 columnas nuevas que sobraban.
     df_final = df_temp[expected_features]
     
     return df_final.values
@@ -166,10 +143,6 @@ with st.sidebar:
         
     st.markdown("---")
     st.subheader("Configuración Algorítmica")
-    
-    # NUEVO: Checkbox para cambiar el paradigma de análisis
-    modo_polifonico = st.toggle("Modo Polifónico (Mezcla de Instrumentos)", value=False, 
-                                help="Activa esta opción si el audio contiene varios instrumentos. El motor dividirá la huella acústica en múltiples componentes.")
     
     umbral = st.slider("Confianza Mínima Global", 0.0, 1.0, 0.60, 0.05, 
                        help="Umbral de certeza para identificar al instrumento dominante.")
@@ -199,7 +172,6 @@ if uploaded_file is not None and ejecutar:
         chart_placeholder = st.empty() 
         
         probabilidades_acumuladas = []
-        
         tiempos_extraccion = []
         tiempos_inferencia = []
 
@@ -283,46 +255,15 @@ if uploaded_file is not None and ejecutar:
         st.markdown("---")
         st.subheader("Reporte de Inferencia Global")
         
-        # LÓGICA BIFURCADA: Monofónico vs Polifónico
-        if modo_polifonico:
-            st.info("🧠 Análisis Polifónico Activo: Descomponiendo la huella acústica de la mezcla...")
-            
-            # En Softmax de 5 clases, la probabilidad aleatoria es 20%. 
-            # Cualquier cosa por encima del 25% en una mezcla es una señal fuerte.
-            umbral_mezcla = 0.25 
-            
-            instrumentos_mezcla = []
-            for i, prob in enumerate(probabilidades_globales):
-                if prob >= umbral_mezcla:
-                    nombre_inst = instrument_map.get(le.classes_[i].lower(), le.classes_[i])
-                    instrumentos_mezcla.append((nombre_inst, prob))
-            
-            # Ordenar de mayor a menor presencia
-            instrumentos_mezcla.sort(key=lambda x: x[1], reverse=True)
-            
-            if len(instrumentos_mezcla) >= 1:
-                st.success(f"Se han identificado {len(instrumentos_mezcla)} instrumentos principales en la mezcla espectral.")
-                cols_poly = st.columns(len(instrumentos_mezcla))
-                for idx, (nombre, prob) in enumerate(instrumentos_mezcla):
-                    cols_poly[idx].metric(label=f"Componente Acústico {idx+1}", 
-                                          value=nombre, 
-                                          delta=f"{prob*100:.1f}% de la huella total", 
-                                          delta_color="off")
-            else:
-                st.warning("El análisis polifónico no encontró firmas espectrales claras. La mezcla presenta un ruido armónico muy alto (Enmascaramiento).")
-
+        if certeza_global < umbral:
+            st.warning(f"Diagnóstico Inconcluso: La certeza promedio ({certeza_global*100:.2f}%) no supera el umbral establecido del {umbral*100:.0f}%. El audio presenta características altamente mixtas.")
         else:
-            # Lógica Monofónica Original
-            if certeza_global < umbral:
-                st.warning(f"Diagnóstico Inconcluso: La certeza promedio ({certeza_global*100:.2f}%) no supera el umbral establecido del {umbral*100:.0f}%. El audio presenta características altamente mixtas.")
-            else:
-                col_met1, col_met2, col_met3 = st.columns(3)
-                col_met1.metric(label="Clase Predominante Identificada", value=nombre_instrumento)
-                col_met2.metric(label="Nivel de Certeza Ponderado", value=f"{certeza_global*100:.2f} %")
-                col_met3.metric(label="Segmentos Evaluados", value=f"{total_chunks} ventanas (5s)")
-                st.success("Análisis secuencial monofónico completado satisfactoriamente.")
+            col_met1, col_met2, col_met3 = st.columns(3)
+            col_met1.metric(label="Clase Predominante Identificada", value=nombre_instrumento)
+            col_met2.metric(label="Nivel de Certeza Ponderado", value=f"{certeza_global*100:.2f} %")
+            col_met3.metric(label="Segmentos Evaluados", value=f"{total_chunks} ventanas (5s)")
+            st.success("Análisis secuencial monofónico completado satisfactoriamente.")
         
-        # (NUEVO) Métricas de Hardware (Se muestran siempre, sin importar el modo)
         st.markdown("##### Métricas de Latencia y Desempeño (Hardware Local)")
         col_perf1, col_perf2, col_perf3 = st.columns(3)
         
@@ -335,7 +276,6 @@ if uploaded_file is not None and ejecutar:
         col_perf3.metric(label="Tiempo Total de Cómputo", value=f"{tiempo_total_procesamiento:.2f} s")
 
         # --- SECCIÓN 2: LABORATORIO DE ANÁLISIS VISUAL ---
-        # --- SECCIÓN 2: LABORATORIO DE ANÁLISIS VISUAL ---
         st.markdown("---")
         st.subheader("Laboratorio de Análisis Paramétrico (Señal Completa)")
         
@@ -343,12 +283,9 @@ if uploaded_file is not None and ejecutar:
         
         with tab1:
             st.markdown("**Distribución de Energía Global (Dominio Tiempo-Frecuencia)**")
-            st.markdown("**Distribución de Energía Global (Dominio Tiempo-Frecuencia)**")
             fig_mel, ax_mel = plt.subplots(figsize=(10, 4))
             S = librosa.feature.melspectrogram(y=y_full, sr=sr_full, n_mels=128)
-            S = librosa.feature.melspectrogram(y=y_full, sr=sr_full, n_mels=128)
             S_dB = librosa.power_to_db(S, ref=np.max)
-            img = librosa.display.specshow(S_dB, x_axis='time', y_axis='mel', sr=sr_full, ax=ax_mel, cmap='viridis')
             img = librosa.display.specshow(S_dB, x_axis='time', y_axis='mel', sr=sr_full, ax=ax_mel, cmap='viridis')
             fig_mel.colorbar(img, ax=ax_mel, format='%+2.0f dB')
             st.pyplot(fig_mel)
@@ -356,8 +293,6 @@ if uploaded_file is not None and ejecutar:
         with tab2:
             st.markdown("**Estabilidad Tímbrica: Centroide Espectral a lo largo del tiempo**")
             fig_cent, ax_cent = plt.subplots(figsize=(10, 3))
-            cent = librosa.feature.spectral_centroid(y=y_full, sr=sr_full)[0]
-            times = librosa.times_like(cent, sr=sr_full)
             cent = librosa.feature.spectral_centroid(y=y_full, sr=sr_full)[0]
             times = librosa.times_like(cent, sr=sr_full)
             
@@ -372,9 +307,7 @@ if uploaded_file is not None and ejecutar:
 
         with tab3:
             st.markdown("**Envolvente de Amplitud (Dominio Temporal Submuestreado)**")
-            st.markdown("**Envolvente de Amplitud (Dominio Temporal Submuestreado)**")
             fig_wave, ax_wave = plt.subplots(figsize=(10, 2))
-            librosa.display.waveshow(y_full, sr=sr_full, ax=ax_wave, color='#343a40', alpha=0.8, max_points=10000)
             librosa.display.waveshow(y_full, sr=sr_full, ax=ax_wave, color='#343a40', alpha=0.8, max_points=10000)
             ax_wave.set_ylabel('Amplitud')
             ax_wave.set_xlabel('Tiempo (s)')
@@ -384,7 +317,6 @@ if uploaded_file is not None and ejecutar:
             st.pyplot(fig_wave)
 
     except Exception as e:
-        st.error(f"Fallo crítico en la ejecución del proceso analítico: {e}")
         st.error(f"Fallo crítico en la ejecución del proceso analítico: {e}")
     finally:
         if os.path.exists(tmp_filepath): os.remove(tmp_filepath)
