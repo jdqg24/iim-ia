@@ -2,6 +2,9 @@
 venv/
 env/
 .env/
+audiofinger/
+.zencoder
+.zenflow
 
 # Archivos compilados de Python
 __pycache__/

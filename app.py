@@ -10,6 +10,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 import scipy.signal
 import time
+import time
 
 from src.preprocessing.preprocess_audio import load_and_normalize
 from src.utils.audio_utils_v2 import (
@@ -24,6 +25,8 @@ from src.utils.audio_utils_v2 import (
 
 # === 1. Configuración de la página ===
 st.set_page_config(page_title="Inferencia Acústica", layout="wide")
+# === 1. Configuración de la página ===
+st.set_page_config(page_title="Inferencia Acústica", layout="wide")
 
 plt.rcParams.update({
     'font.size': 10,
@@ -36,6 +39,7 @@ plt.rcParams.update({
     'grid.color': '#e9ecef'
 })
 
+st.title("Identificación Acústica de Instrumentos Musicales")
 st.title("Identificación Acústica de Instrumentos Musicales")
 st.markdown("""
 Plataforma analítica fundamentada en **Extreme Gradient Boosting (XGBoost)** para la clasificación multiclase de señales acústicas. 
@@ -93,12 +97,24 @@ def get_feature_names():
     return feature_names
 
 def extract_single_feature_vector(y, sr):
+def extract_single_feature_vector(y, sr):
     b, a = scipy.signal.butter(N=4, Wn=100 / (sr / 2), btype='high')
+    y_filt = scipy.signal.filtfilt(b, a, y)
     y_filt = scipy.signal.filtfilt(b, a, y)
 
     if len(y_filt) < 2048:
         y_filt = np.pad(y_filt, (0, 2048 - len(y_filt)), mode='constant')
+    if len(y_filt) < 2048:
+        y_filt = np.pad(y_filt, (0, 2048 - len(y_filt)), mode='constant')
 
+    temp_feat = compute_temporal_features(y_filt, sr).tolist()
+    spec_feat = compute_spectral_features(y_filt, sr).tolist()
+    anti_conf_feat = compute_anti_confusion_features(y_filt, sr).tolist()
+    energy_ratio_feat = compute_energy_ratios(y_filt, sr).tolist()
+    harmonic_purity_feat = compute_harmonic_purity(y_filt, sr).tolist() 
+    env_feat = compute_envelope_stats(y_filt).tolist()
+    vibrato_feat = compute_vibrato_features(y_filt, sr).tolist()
+    bow_reed_feat = compute_bow_vs_reed_features(y_filt, sr).tolist()
     temp_feat = compute_temporal_features(y_filt, sr).tolist()
     spec_feat = compute_spectral_features(y_filt, sr).tolist()
     anti_conf_feat = compute_anti_confusion_features(y_filt, sr).tolist()
@@ -251,6 +267,7 @@ if uploaded_file is not None and ejecutar:
         df_probs_final = pd.DataFrame({
             'Instrumento': [instrument_map.get(c.lower(), c) for c in le.classes_],
             'Probabilidad (%)': probabilidades_globales * 100
+            'Probabilidad (%)': probabilidades_globales * 100
         }).sort_values(by='Probabilidad (%)', ascending=True)
 
         fig_final, ax_final = plt.subplots(figsize=(10, 3))
@@ -320,6 +337,7 @@ if uploaded_file is not None and ejecutar:
         col_perf3.metric(label="Tiempo Total de Cómputo", value=f"{tiempo_total_procesamiento:.2f} s")
 
         # --- SECCIÓN 2: LABORATORIO DE ANÁLISIS VISUAL ---
+        # --- SECCIÓN 2: LABORATORIO DE ANÁLISIS VISUAL ---
         st.markdown("---")
         st.subheader("Laboratorio de Análisis Paramétrico (Señal Completa)")
         
@@ -327,9 +345,12 @@ if uploaded_file is not None and ejecutar:
         
         with tab1:
             st.markdown("**Distribución de Energía Global (Dominio Tiempo-Frecuencia)**")
+            st.markdown("**Distribución de Energía Global (Dominio Tiempo-Frecuencia)**")
             fig_mel, ax_mel = plt.subplots(figsize=(10, 4))
             S = librosa.feature.melspectrogram(y=y_full, sr=sr_full, n_mels=128)
+            S = librosa.feature.melspectrogram(y=y_full, sr=sr_full, n_mels=128)
             S_dB = librosa.power_to_db(S, ref=np.max)
+            img = librosa.display.specshow(S_dB, x_axis='time', y_axis='mel', sr=sr_full, ax=ax_mel, cmap='viridis')
             img = librosa.display.specshow(S_dB, x_axis='time', y_axis='mel', sr=sr_full, ax=ax_mel, cmap='viridis')
             fig_mel.colorbar(img, ax=ax_mel, format='%+2.0f dB')
             st.pyplot(fig_mel)
@@ -337,6 +358,8 @@ if uploaded_file is not None and ejecutar:
         with tab2:
             st.markdown("**Estabilidad Tímbrica: Centroide Espectral a lo largo del tiempo**")
             fig_cent, ax_cent = plt.subplots(figsize=(10, 3))
+            cent = librosa.feature.spectral_centroid(y=y_full, sr=sr_full)[0]
+            times = librosa.times_like(cent, sr=sr_full)
             cent = librosa.feature.spectral_centroid(y=y_full, sr=sr_full)[0]
             times = librosa.times_like(cent, sr=sr_full)
             
@@ -351,7 +374,9 @@ if uploaded_file is not None and ejecutar:
 
         with tab3:
             st.markdown("**Envolvente de Amplitud (Dominio Temporal Submuestreado)**")
+            st.markdown("**Envolvente de Amplitud (Dominio Temporal Submuestreado)**")
             fig_wave, ax_wave = plt.subplots(figsize=(10, 2))
+            librosa.display.waveshow(y_full, sr=sr_full, ax=ax_wave, color='#343a40', alpha=0.8, max_points=10000)
             librosa.display.waveshow(y_full, sr=sr_full, ax=ax_wave, color='#343a40', alpha=0.8, max_points=10000)
             ax_wave.set_ylabel('Amplitud')
             ax_wave.set_xlabel('Tiempo (s)')
@@ -361,6 +386,7 @@ if uploaded_file is not None and ejecutar:
             st.pyplot(fig_wave)
 
     except Exception as e:
+        st.error(f"Fallo crítico en la ejecución del proceso analítico: {e}")
         st.error(f"Fallo crítico en la ejecución del proceso analítico: {e}")
     finally:
         if os.path.exists(tmp_filepath): os.remove(tmp_filepath)
