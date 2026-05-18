@@ -1,49 +1,51 @@
-# train_model.py
+# train_model_v2.py (Iteración 2: Modelo Optimizado con Poda de Características - Sin Gráficos)
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import xgboost as xgb
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.metrics import classification_report, accuracy_score
 import joblib
 
-# === 1. Cargar features ===
+# === 1. Cargar y Podar Características (Feature Pruning) ===
+print("=== FASE 2: ENTRENAMIENTO DE MODELO OPTIMIZADO (PRUNED) ===")
 print("Cargando dataset...")
-df = pd.read_csv("data_v3/features_dataset.csv")
+df = pd.read_csv("../musical_instruments/features_dataset.csv")
 
-# 🚨 EL FILTRO DE GRASA (Feature Pruning) 🚨
-# Eliminamos todas las derivadas de 2do orden (delta2) 
-# para forzar al modelo a usar las variables físicas e ignorar el ruido matemático.
-columnas_a_borrar = [col for col in df.columns if "delta2" in col]
-df = df.drop(columns=columnas_a_borrar)
+# LA PODA: Las derivadas espectrales de segundo orden (delta2) introducen ruido matemático 
+# en entornos polifónicos. Las eliminamos para optimizar la dimensionalidad.
+cols_to_drop = [col for col in df.columns if "delta2" in col]
+df_pruned = df.drop(columns=cols_to_drop)
 
-print(f"Dataset reducido: Se eliminaron {len(columnas_a_borrar)} columnas de ruido.")
-print(f"Total de columnas activas para el entrenamiento: {len(df.columns)}")
+# Separar variables predictoras y objetivo
+X = df_pruned.drop(columns=["FileName", "Class"]).values
+y_text = df_pruned["Class"].values
+feature_names = df_pruned.drop(columns=["FileName", "Class"]).columns
 
-X = df.drop(columns=["FileName", "Class"]).values
-y_text = df["Class"].values
+print("\n--- Reducción de Dimensionalidad ---")
+print(f"Características originales (Base): {len(df.columns) - 2}")
+print(f"Características podadas (delta2): {len(cols_to_drop)}")
+print(f"Total de características activas para el entrenamiento: {len(feature_names)}\n")
 
-# Limpiar valores infinitos
+# Limpiar valores infinitos generados por divisiones por cero en el ETL
 X = np.nan_to_num(X, nan=np.nan, posinf=np.nan, neginf=np.nan)
 
+# Codificar etiquetas de texto a numéricas
 le = LabelEncoder()
 y = le.fit_transform(y_text)
-feature_names = df.drop(columns=["FileName", "Class"]).columns
 
-# === 2. Crear el Pipeline con XGBoost Ajustado ===
+# === 2. Crear el Pipeline con XGBoost Optimizado ===
 pipeline = Pipeline([
     ('imputer', SimpleImputer(strategy='median')),
     ('scaler', StandardScaler()),
     ('classifier', xgb.XGBClassifier(
-        n_estimators=500,          # Subimos ligeramente la cantidad para compensar árboles más simples
-        max_depth=5,               # Reducido de 7 a 4: Evita que se vicie con características dominantes
-        learning_rate=0.05,        
+        n_estimators=300,          # Reducido para evitar overfitting en el espacio podado
+        max_depth=6,               # Aumentado para capturar relaciones más complejas
+        learning_rate=0.1,         # Tasa de aprendizaje acelerada
         subsample=0.8,             
-        colsample_bytree=0.4,      # Reducido a 40%: Fuerza al modelo a mirar las columnas nuevas
+        colsample_bytree=0.8,      # Incrementado para forzar la exploración de la física restante
         objective='multi:softprob',
         random_state=42,
         n_jobs=-1
@@ -51,7 +53,7 @@ pipeline = Pipeline([
 ])
 
 # === 3. Validación K-Fold y Recolección de Predicciones ===
-print("Iniciando validación cruzada K-Fold con XGBoost...")
+print("Iniciando validación cruzada K-Fold (K=5) en el espacio reducido...")
 kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 acc_list = []
 
@@ -73,36 +75,32 @@ for fold, (train_idx, test_idx) in enumerate(kf.split(X, y), 1):
     
     print(f"Fold {fold} - Accuracy: {acc:.4f}")
 
-print(f"\n=== Promedio Accuracy K-Fold: {np.mean(acc_list):.4f} ± {np.std(acc_list):.4f} ===")
+print(f"\n=== Promedio Accuracy K-Fold (Optimizado): {np.mean(acc_list):.4f} ± {np.std(acc_list):.4f} ===")
 
-# === 4. Reporte y Matriz de Confusión ===
-print("\nReporte Global:")
+# === 4. Reporte ===
+print("\nReporte Global (Modelo Podado):")
 print(classification_report(y_true_all, y_pred_all, target_names=le.classes_, digits=3))
 
-print("\nGenerando matriz de confusión...")
-cm = confusion_matrix(y_true_all, y_pred_all)
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", 
-            xticklabels=le.classes_, yticklabels=le.classes_)
-plt.title("Matriz de Confusión Global (XGBoost)")
-plt.ylabel('Etiqueta Real')
-plt.xlabel('Predicción del Modelo')
-plt.tight_layout()
-plt.savefig("matriz_confusion.png", dpi=300)
-print("Matriz guardada como 'matriz_confusion.png'.")
-
-# === 5. Entrenar Modelo Final ===
-print("\nEntrenando modelo final con el 100% del dataset...")
+# === 5. Entrenar Modelo Final y Extraer Importancia de Características ===
+print("\nEntrenando modelo definitivo con el 100% del dataset reducido...")
 pipeline.fit(X, y)
 
 classifier = pipeline.named_steps['classifier']
 importances = classifier.feature_importances_
 
 indices_sorted = np.argsort(importances)[::-1]
-print("\n=== TOP 20 CARACTERÍSTICAS MÁS IMPORTANTES ===")
+print("\n=== TOP 20 CARACTERÍSTICAS MÁS IMPORTANTES (MODELO OPTIMIZADO) ===")
 for i in range(20):
     idx = indices_sorted[i]
     print(f"{i+1}. {feature_names[idx]}: {importances[idx]:.4f}")
 
-joblib.dump({'pipeline': pipeline, 'label_encoder': le}, "src/models/Audio_XGBoost_Model.pkl")
-print("\nPipeline y codificador guardados en 'src/models/Audio_XGBoost_Model.pkl'.")
+# === 6. Exportación para Producción ===
+# NUEVO: Ahora también guardamos la lista exacta de nombres de columnas (feature_names)
+joblib.dump({
+    'pipeline': pipeline, 
+    'label_encoder': le,
+    'expected_features': list(feature_names)  # <- Esta es la clave del enrutador dinámico
+}, "Audio_XGBoost_Pruned_Model.pkl")
+
+print("\nPipeline optimizado y codificador guardados en 'Audio_XGBoost_Pruned_Model.pkl'.")
+print("PROCESO FINALIZADO CON ÉXITO.")

@@ -12,7 +12,7 @@ import scipy.signal
 import time
 
 from src.preprocessing.preprocess_audio import load_and_normalize
-from src.utils.audio_utils_v2 import (
+from src.utils.audio_utils import (
     compute_temporal_features, compute_spectral_features,
     compute_spectral_contrast, compute_chroma_features,
     compute_rhythm_and_pitch, compute_mfcc_features, 
@@ -46,18 +46,17 @@ st.divider()
 # === 2. Cargar el Modelo ===
 @st.cache_resource
 def load_model():
-    return joblib.load("src/models/Audio_XGBoost_Pruned_Model.pkl")
+    return joblib.load("src/models/Audio_XGBoost_Model.pkl")
 
 try:
     model_data = load_model()
     pipeline = model_data['pipeline']
     le = model_data['label_encoder']
-    expected_features = model_data['expected_features'] # NUEVO: Cargamos el esquema exacto
 except Exception as e:
-    st.error("Excepción de I/O: No se localizó el archivo del modelo predictivo.")
+    st.error("Excepción de I/O: No se localizó el archivo del modelo predictivo en el directorio 'src/models/'.")
     st.stop()
 
-# === 3. Extracción de Características (OPTIMIZADA) ===
+# === 3. Extracción de Características ===
 def get_feature_names():
     feature_names = []
     stats = ["mean", "std", "max", "min", "range", "skew", "kurt"]
@@ -85,8 +84,7 @@ def get_feature_names():
     for s in stats: feature_names.append(f"F0_{s}")
     feature_names.append("Tempo_BPM")
 
-    # OPTIMIZACIÓN: Solo generamos nombres para MFCC y MFCC_delta. Ignoramos delta2.
-    for prefix in ["MFCC", "MFCC_delta"]:
+    for prefix in ["MFCC", "MFCC_delta", "MFCC_delta2"]:
         for i in range(1, 14):
             for s in stats:
                 feature_names.append(f"{prefix}{i}_{s}")
@@ -111,27 +109,20 @@ def extract_single_feature_vector(y, sr):
     contrast = compute_spectral_contrast(y_filt, sr)
     chroma_stft, chroma_cens, tonnetz = compute_chroma_features(y_filt, sr)
     onset_env, f0, tempo = compute_rhythm_and_pitch(y_filt, sr)
-    
-    # OPTIMIZACIÓN: Ignoramos el tercer valor devuelto (delta2) con el guión bajo "_"
-    mfcc, delta, _ = compute_mfcc_features(y_filt, sr)
+    mfcc, delta, delta2 = compute_mfcc_features(y_filt, sr)
 
-    # OPTIMIZACIÓN: Ya no concatenamos compute_stats(delta2)
     final_vector = (
         temp_feat + spec_feat + anti_conf_feat + energy_ratio_feat + 
         harmonic_purity_feat + env_feat + vibrato_feat + bow_reed_feat +
         compute_stats(contrast) + compute_stats(chroma_stft) + 
         compute_stats(chroma_cens) + compute_stats(tonnetz) + 
         compute_stats(onset_env) + compute_stats(f0) + [tempo] + 
-        compute_stats(mfcc) + compute_stats(delta)
+        compute_stats(mfcc) + compute_stats(delta) + compute_stats(delta2)
     )
     
-    # Creamos un DataFrame con las 480 características extraídas
     df_temp = pd.DataFrame([final_vector], columns=get_feature_names())
-    
-    # FILTRADO DINÁMICO: 
-    # Le decimos a Pandas que seleccione ÚNICAMENTE las 473 columnas que el modelo conoce,
-    # ignorando automáticamente las 7 columnas nuevas que sobraban.
-    df_final = df_temp[expected_features]
+    columnas_a_borrar = [col for col in df_temp.columns if "delta2" in col]
+    df_final = df_temp.drop(columns=columnas_a_borrar)
     
     return df_final.values
 
@@ -151,13 +142,8 @@ with st.sidebar:
         
     st.markdown("---")
     st.subheader("Configuración Algorítmica")
-    
-    # NUEVO: Checkbox para cambiar el paradigma de análisis
-    modo_polifonico = st.toggle("Modo Polifónico (Mezcla de Instrumentos)", value=False, 
-                                help="Activa esta opción si el audio contiene varios instrumentos. El motor dividirá la huella acústica en múltiples componentes.")
-    
     umbral = st.slider("Confianza Mínima Global", 0.0, 1.0, 0.60, 0.05, 
-                       help="Umbral de certeza para identificar al instrumento dominante.")
+                       help="Umbral mínimo de certeza promedio para considerar la inferencia como válida.")
     
     ejecutar = st.button("Ejecutar Análisis Predictivo", use_container_width=True, type="primary")
 
@@ -178,13 +164,14 @@ if uploaded_file is not None and ejecutar:
         st.subheader("Estado de Procesamiento Analítico")
         progress_bar = st.progress(0)
         status_text = st.empty()
-        metric_text = st.empty() 
+        metric_text = st.empty() # NUEVO: Para mostrar el tiempo en vivo
         
         st.markdown("#### Función de Probabilidad (Actualización en Vivo)")
         chart_placeholder = st.empty() 
         
         probabilidades_acumuladas = []
         
+        # NUEVO: Listas para almacenar tiempos de ejecución
         tiempos_extraccion = []
         tiempos_inferencia = []
 
@@ -196,25 +183,30 @@ if uploaded_file is not None and ejecutar:
             
             status_text.text(f"Procesando Ventana {i+1} de {total_chunks} ({(i*window_sec):.1f}s - {((i+1)*window_sec):.1f}s)...")
             
+            # NUEVO: Medir tiempo de extracción de características (Suele ser lento)
             t0_ext = time.time()
             X_pred = extract_single_feature_vector(y_chunk, sr_full)
             X_pred = np.nan_to_num(X_pred, nan=0.0, posinf=0.0, neginf=0.0)
             t1_ext = time.time()
             
+            # NUEVO: Medir tiempo de inferencia del modelo (XGBoost suele ser rápido)
             t0_inf = time.time()
             probs_chunk = pipeline.predict_proba(X_pred)[0]
             t1_inf = time.time()
             
+            # Guardar tiempos
             tiempo_ext_seg = t1_ext - t0_ext
-            tiempo_inf_ms = (t1_inf - t0_inf) * 1000 
+            tiempo_inf_ms = (t1_inf - t0_inf) * 1000 # Convertir inferencia a milisegundos
             
             tiempos_extraccion.append(tiempo_ext_seg)
             tiempos_inferencia.append(tiempo_inf_ms)
             
+            # Mostrar métrica en vivo
             metric_text.markdown(f"⏱️ **Extracción:** `{tiempo_ext_seg:.2f}s` | **Inferencia:** `{tiempo_inf_ms:.2f}ms`")
             
             probabilidades_acumuladas.append(probs_chunk)
             
+            # Generar gráfico temporal para la ventana actual
             df_probs_live = pd.DataFrame({
                 'Instrumento': [instrument_map.get(c.lower(), c) for c in le.classes_],
                 'Probabilidad (%)': probs_chunk * 100
@@ -228,6 +220,7 @@ if uploaded_file is not None and ejecutar:
             for spine in ['top', 'right']:
                 ax_live.spines[spine].set_visible(False)
             
+            # Actualizar lienzo y liberar memoria
             chart_placeholder.pyplot(fig_live)
             plt.close(fig_live) 
             
@@ -235,7 +228,7 @@ if uploaded_file is not None and ejecutar:
 
         # --- CONSOLIDACIÓN DE RESULTADOS ---
         status_text.text("Consolidando resultados y promediando probabilidades...")
-        metric_text.empty() 
+        metric_text.empty() # Limpiar texto temporal
         
         probabilidades_globales = np.mean(probabilidades_acumuladas, axis=0)
         idx_ganador = np.argmax(probabilidades_globales)
@@ -248,6 +241,7 @@ if uploaded_file is not None and ejecutar:
         progress_bar.empty()
         status_text.empty()
 
+        # Actualizar el lienzo dinámico con el gráfico FINAL (Ponderado)
         df_probs_final = pd.DataFrame({
             'Instrumento': [instrument_map.get(c.lower(), c) for c in le.classes_],
             'Probabilidad (%)': probabilidades_globales * 100
@@ -268,56 +262,27 @@ if uploaded_file is not None and ejecutar:
         st.markdown("---")
         st.subheader("Reporte de Inferencia Global")
         
-        # LÓGICA BIFURCADA: Monofónico vs Polifónico
-        if modo_polifonico:
-            st.info("🧠 Análisis Polifónico Activo: Descomponiendo la huella acústica de la mezcla...")
-            
-            # En Softmax de 5 clases, la probabilidad aleatoria es 20%. 
-            # Cualquier cosa por encima del 25% en una mezcla es una señal fuerte.
-            umbral_mezcla = 0.25 
-            
-            instrumentos_mezcla = []
-            for i, prob in enumerate(probabilidades_globales):
-                if prob >= umbral_mezcla:
-                    nombre_inst = instrument_map.get(le.classes_[i].lower(), le.classes_[i])
-                    instrumentos_mezcla.append((nombre_inst, prob))
-            
-            # Ordenar de mayor a menor presencia
-            instrumentos_mezcla.sort(key=lambda x: x[1], reverse=True)
-            
-            if len(instrumentos_mezcla) >= 1:
-                st.success(f"Se han identificado {len(instrumentos_mezcla)} instrumentos principales en la mezcla espectral.")
-                cols_poly = st.columns(len(instrumentos_mezcla))
-                for idx, (nombre, prob) in enumerate(instrumentos_mezcla):
-                    cols_poly[idx].metric(label=f"Componente Acústico {idx+1}", 
-                                          value=nombre, 
-                                          delta=f"{prob*100:.1f}% de la huella total", 
-                                          delta_color="off")
-            else:
-                st.warning("El análisis polifónico no encontró firmas espectrales claras. La mezcla presenta un ruido armónico muy alto (Enmascaramiento).")
-
+        if certeza_global < umbral:
+            st.warning(f"Diagnóstico Inconcluso: La certeza promedio ({certeza_global*100:.2f}%) no supera el umbral establecido del {umbral*100:.0f}%. El audio presenta características altamente mixtas.")
         else:
-            # Lógica Monofónica Original
-            if certeza_global < umbral:
-                st.warning(f"Diagnóstico Inconcluso: La certeza promedio ({certeza_global*100:.2f}%) no supera el umbral establecido del {umbral*100:.0f}%. El audio presenta características altamente mixtas.")
-            else:
-                col_met1, col_met2, col_met3 = st.columns(3)
-                col_met1.metric(label="Clase Predominante Identificada", value=nombre_instrumento)
-                col_met2.metric(label="Nivel de Certeza Ponderado", value=f"{certeza_global*100:.2f} %")
-                col_met3.metric(label="Segmentos Evaluados", value=f"{total_chunks} ventanas (5s)")
-                st.success("Análisis secuencial monofónico completado satisfactoriamente.")
-        
-        # (NUEVO) Métricas de Hardware (Se muestran siempre, sin importar el modo)
-        st.markdown("##### Métricas de Latencia y Desempeño (Hardware Local)")
-        col_perf1, col_perf2, col_perf3 = st.columns(3)
-        
-        avg_extraccion = np.mean(tiempos_extraccion)
-        avg_inferencia = np.mean(tiempos_inferencia)
-        tiempo_total_procesamiento = np.sum(tiempos_extraccion) + (np.sum(tiempos_inferencia)/1000)
-        
-        col_perf1.metric(label="Tiempo Medio de Extracción", value=f"{avg_extraccion:.2f} s / ventana", delta="Optimizado (Pruned)", delta_color="normal")
-        col_perf2.metric(label="Tiempo Medio de Inferencia", value=f"{avg_inferencia:.2f} ms / ventana", delta="XGBoost", delta_color="off")
-        col_perf3.metric(label="Tiempo Total de Cómputo", value=f"{tiempo_total_procesamiento:.2f} s")
+            col_met1, col_met2, col_met3 = st.columns(3)
+            col_met1.metric(label="Clase Predominante Identificada", value=nombre_instrumento)
+            col_met2.metric(label="Nivel de Certeza Ponderado", value=f"{certeza_global*100:.2f} %")
+            col_met3.metric(label="Segmentos Evaluados", value=f"{total_chunks} ventanas (5s)")
+            
+            # NUEVO: Mostrar fila adicional con las métricas de latencia de tu sistema
+            st.markdown("##### Métricas de Latencia y Desempeño (Hardware Local)")
+            col_perf1, col_perf2, col_perf3 = st.columns(3)
+            
+            avg_extraccion = np.mean(tiempos_extraccion)
+            avg_inferencia = np.mean(tiempos_inferencia)
+            tiempo_total_procesamiento = np.sum(tiempos_extraccion) + (np.sum(tiempos_inferencia)/1000)
+            
+            col_perf1.metric(label="Tiempo Medio de Extracción", value=f"{avg_extraccion:.2f} s / ventana", delta="Librosa/NumPy", delta_color="off")
+            col_perf2.metric(label="Tiempo Medio de Inferencia", value=f"{avg_inferencia:.2f} ms / ventana", delta="XGBoost", delta_color="off")
+            col_perf3.metric(label="Tiempo Total de Cómputo", value=f"{tiempo_total_procesamiento:.2f} s")
+            
+            st.success("Análisis secuencial completado satisfactoriamente.")
 
         # --- SECCIÓN 2: LABORATORIO DE ANÁLISIS VISUAL ---
         st.markdown("---")
