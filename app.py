@@ -57,7 +57,7 @@ except Exception as e:
     st.error("Excepción de I/O: No se localizó el archivo del modelo predictivo.")
     st.stop()
 
-# === 3. Extracción de Características (OPTIMIZADA) ===
+# === 3. Extracción de Características ===
 def get_feature_names():
     feature_names = []
     stats = ["mean", "std", "max", "min", "range", "skew", "kurt"]
@@ -135,20 +135,6 @@ instrument_map = {
 }
 
 with st.sidebar:
-    # --- NUEVA SECCIÓN DE ALCANCE ---
-    st.subheader("Capacidad de Inferencia")
-    st.markdown("""
-    El modelo ha sido entrenado exclusivamente para aislar e identificar las firmas acústicas de los siguientes instrumentos:
-    * 🎸 **Guitarra Acústica**
-    * 🎹 **Piano**
-    * 🎻 **Violín**
-    * 🌬️ **Flauta**
-    * 🎷 **Saxofón**
-    
-    *(El ingreso de señales fuera de este dominio espectral forzará una predicción sobre la clase más cercana).*
-    """)
-    
-    st.markdown("---")
     st.subheader("Parámetros de Entrada")
     uploaded_file = st.file_uploader("Archivo fuente (WAV, MP3)", type=["wav", "mp3"])
     
@@ -276,7 +262,7 @@ if uploaded_file is not None and ejecutar:
             col_met1.metric(label="Clase Predominante Identificada", value=nombre_instrumento)
             col_met2.metric(label="Nivel de Certeza Ponderado", value=f"{certeza_global*100:.2f} %")
             col_met3.metric(label="Segmentos Evaluados", value=f"{total_chunks} ventanas (5s)")
-            st.success("Análisis secuencial monofónico completado satisfactoriamente.")
+            st.success("Análisis secuencial completado satisfactoriamente.")
         
         st.markdown("##### Métricas de Latencia y Desempeño (Hardware Local)")
         col_perf1, col_perf2, col_perf3 = st.columns(3)
@@ -336,4 +322,15 @@ if uploaded_file is not None and ejecutar:
         if os.path.exists(tmp_filepath): os.remove(tmp_filepath)
 
 elif uploaded_file is None:
+    st.subheader("Capacidad de Inferencia")
+    st.markdown("""
+    El modelo actual ha sido entrenado exclusivamente para aislar e identificar las firmas acústicas de los siguientes instrumentos:
+    * **Guitarra Acústica**
+    * **Piano**
+    * **Violín**
+    * **Flauta**
+    * **Saxofón**
+    
+    *(El ingreso de señales fuera de este dominio espectral forzará una predicción sobre la clase más cercana).*
+    """)
     st.info("A la espera de datos. Por favor, cargue un archivo de audio en el panel lateral para iniciar la evaluación.")
