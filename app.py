@@ -97,7 +97,6 @@ def get_feature_names():
     return feature_names
 
 def extract_single_feature_vector(y, sr):
-def extract_single_feature_vector(y, sr):
     b, a = scipy.signal.butter(N=4, Wn=100 / (sr / 2), btype='high')
     y_filt = scipy.signal.filtfilt(b, a, y)
     y_filt = scipy.signal.filtfilt(b, a, y)
