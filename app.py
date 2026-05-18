@@ -198,7 +198,7 @@ if uploaded_file is not None and ejecutar:
             tiempos_extraccion.append(tiempo_ext_seg)
             tiempos_inferencia.append(tiempo_inf_ms)
             
-            metric_text.markdown(f"⏱️ **Extracción:** `{tiempo_ext_seg:.2f}s` | **Inferencia:** `{tiempo_inf_ms:.2f}ms`")
+            metric_text.markdown(f"**Extracción:** `{tiempo_ext_seg:.2f}s` | **Inferencia:** `{tiempo_inf_ms:.2f}ms`")
             
             probabilidades_acumuladas.append(probs_chunk)
             
