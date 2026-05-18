@@ -266,7 +266,6 @@ if uploaded_file is not None and ejecutar:
         df_probs_final = pd.DataFrame({
             'Instrumento': [instrument_map.get(c.lower(), c) for c in le.classes_],
             'Probabilidad (%)': probabilidades_globales * 100
-            'Probabilidad (%)': probabilidades_globales * 100
         }).sort_values(by='Probabilidad (%)', ascending=True)
 
         fig_final, ax_final = plt.subplots(figsize=(10, 3))
