@@ -264,7 +264,7 @@ if uploaded_file is not None and ejecutar:
             col_met3.metric(label="Segmentos Evaluados", value=f"{total_chunks} ventanas (5s)")
             st.success("Análisis secuencial completado satisfactoriamente.")
         
-        st.markdown("##### Métricas de Latencia y Desempeño (Hardware Local)")
+        st.markdown("##### Métricas de Desempeño")
         col_perf1, col_perf2, col_perf3 = st.columns(3)
         
         avg_extraccion = np.mean(tiempos_extraccion)
@@ -277,7 +277,7 @@ if uploaded_file is not None and ejecutar:
 
         # --- SECCIÓN 2: LABORATORIO DE ANÁLISIS VISUAL ---
         st.markdown("---")
-        st.subheader("Laboratorio de Análisis Paramétrico (Señal Completa)")
+        st.subheader("Análisis Paramétrico")
         
         tab1, tab2, tab3 = st.tabs(["Espectrograma Mel", "Evolución del Centroide", "Morfología de la Onda"])
         
