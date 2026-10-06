@@ -14,7 +14,7 @@ import joblib
 # === 1. Cargar features ===
 print("=== FASE 1: ENTRENAMIENTO DE MODELO BASE ===")
 print("Cargando dataset...")
-df = pd.read_csv("IRMAS_Data/features_dataset.csv")
+df = pd.read_csv("./features_dataset.csv")
 
 # Descartamos metadatos para obtener el conteo exacto de características acústicas
 X = df.drop(columns=["FileName", "Class"]).values
